@@ -17,6 +17,10 @@ dunce = "1"
 open = { version = "5", features = ["shellexecute-on-windows"] }
 regex = "1"
 serde_json = "1"
+pulldown-cmark = "0.12"
+syntect = "5"
+sha2 = "0.10"
+ureq = "2"
 
 [dev-dependencies]
 tempfile = "3"

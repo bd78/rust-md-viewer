@@ -20,3 +20,4 @@ pub mod config;
 pub mod documents;
 pub mod html;
 pub mod links;
+pub mod markdown_render;
