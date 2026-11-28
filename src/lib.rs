@@ -1,6 +1,6 @@
 //! md-view: a read-only desktop viewer for Markdown, Mermaid, CSV, SVG and images.
-//! Rust port of py-md-view: `config` and `documents` mirror the Python modules of the same
-//! name; `html` holds the two Python standard-library string helpers they lean on.
+//! Rust port of py-md-view: `config`, `documents` and `links` mirror the Python modules of the
+//! same name; `html` holds the two Python standard-library string helpers they lean on.
 
 // Documents, links and paths are hostile input: the viewer returns errors, it never panics (AGENTS.md, Rust rule 1).
 #![forbid(unsafe_code)]
@@ -19,3 +19,4 @@
 pub mod config;
 pub mod documents;
 pub mod html;
+pub mod links;
