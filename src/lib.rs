@@ -21,3 +21,4 @@ pub mod documents;
 pub mod html;
 pub mod links;
 pub mod markdown_render;
+pub mod mermaid_render;

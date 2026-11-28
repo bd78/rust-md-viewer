@@ -7,7 +7,7 @@ not started, partial, done.
 |---|---|---|---|
 | Markdown: tables, footnotes, task lists, admonitions, definition lists, highlighting | not started | | |
 | Markdown: ` ```mermaid ` blocks as diagrams | not started | | |
-| Mermaid files (`.mmd`, `.mermaid`) | not started | | |
+| Mermaid files (`.mmd`, `.mermaid`) | partial | | parsing and HTML rendering; no window yet |
 | Delimited files: colour per column, sniffed delimiter, quoted fields, 5,000-row cut | partial | #4 | parsing and HTML, matching Python's `csv` Sniffer and reader; no window yet. Differs on purpose: alignment that would add more than 8 Mi padding entities shows the file unaligned |
 | Delimited files: align button, remembered | not started | | |
 | SVG: vector zoom, natural size from the viewBox | partial | #4 | size detection |
