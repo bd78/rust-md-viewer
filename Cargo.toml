@@ -1,0 +1,20 @@
+[package]
+name = "rust-md-viewer"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.88"
+description = "Read-only desktop viewer for Markdown, Mermaid, CSV, SVG and images (Rust port of md-view)"
+
+[lib]
+name = "md_view"
+
+[[bin]]
+name = "md-view"
+path = "src/main.rs"
+
+[dependencies]
+regex = "1"
+serde_json = "1"
+
+[dev-dependencies]
+tempfile = "3"
