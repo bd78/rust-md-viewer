@@ -13,6 +13,8 @@ name = "md-view"
 path = "src/main.rs"
 
 [dependencies]
+dunce = "1"
+open = { version = "5", features = ["shellexecute-on-windows"] }
 regex = "1"
 serde_json = "1"
 
