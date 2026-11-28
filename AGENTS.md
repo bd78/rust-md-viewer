@@ -18,9 +18,11 @@ These apply to every agent and every session in this repository. A later section
 8. **Report only what ran.** Say what you tested and what you could not run.
 9. **`main` changes through a pull request.** Never commit or push to it. Work on a branch (`fix/…`, `feat/…`,
    `docs/…`, `cleanup/…`). An agent may open a pull request for its own branch and merge it with
-   `gh pr merge --merge --admin` once the CodeRabbit review of the current head has finished, every review finding
-   is fixed or answered with a reason, any checks pass, and there is no conflict. A merge it cannot complete is
-   stopped and reported. It never approves a pull request and never closes one without the person's say-so.
+   `gh pr merge --merge --admin --match-head-commit <sha>`, where `<sha>` is the head the checks ran on, so a later
+   push is never merged unseen. It merges once any checks pass and there is no conflict. The CodeRabbit review runs
+   once, at the end, before the final merge: interim pull requests merge without waiting for it, and the final one
+   waits until that review has finished and every finding is fixed or answered with a reason. A merge it cannot
+   complete is stopped and reported. It never approves a pull request and never closes one without the person's say-so.
 10. **Stop and ask only about** licences outside the allowlist, publishing (crates.io, releases), a new remote,
     secrets, spending money, destructive git (force-push, history rewrite, deleting branches), anything else hard
     to undo, and the choices this file leaves to the person (a disagreement in the specification, the UI stack).
