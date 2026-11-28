@@ -14,7 +14,7 @@ not started, partial, done.
 | Raster images: zoom and drag to pan | not started | | |
 | Text files: verbatim, UTF-16/UTF-8/cp1252, cut at 5 MB | partial | #4 | reading and decoding |
 | Mermaid script: pinned, SHA-256 checked, `--fetch-assets`, `./assets/` copy | not started | | |
-| Command line: files, `--style`/`--light`/`--dark`/`--github`/`--github-ext`, `--no-watch` | not started | | |
+| Command line: files, `--style`/`--light`/`--dark`/`--github`/`--github-ext`, `--no-watch` | partial | | argument parsing matching Python CLI; window integration pending |
 | Tabs and single instance | not started | | |
 | Sidebar | not started | | |
 | Refresh (F5) and file watching | not started | | |
