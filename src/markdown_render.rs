@@ -1,6 +1,7 @@
 use crate::html;
 use pulldown_cmark::{html as cmark_html, CodeBlockKind, Event, Options, Parser, Tag, TagEnd};
 use regex::{Captures, Regex};
+use std::collections::HashSet;
 use std::sync::LazyLock;
 use syntect::highlighting::ThemeSet;
 use syntect::html::highlighted_html_for_string;
@@ -30,11 +31,20 @@ static TASK_ITEM: LazyLock<Regex> = LazyLock::new(|| {
 
 #[allow(clippy::panic)]
 static SCRIPT_TAG: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?i)<script[^>]*>.*?</script>").unwrap_or_else(|e| panic!("invalid regex: {}", e))
+    Regex::new(r"(?si)<script[^>]*>.*?</script>").unwrap_or_else(|e| panic!("invalid regex: {}", e))
 });
 
 pub fn render_markdown(text: &str) -> (String, String) {
     let options = Options::all();
+
+    // First pass: collect explicit heading IDs so generated ones never collide.
+    let reserved_ids: HashSet<String> = Parser::new_ext(text, options)
+        .filter_map(|ev| match ev {
+            Event::Start(Tag::Heading { id, .. }) => id.map(|s| s.to_string()),
+            _ => None,
+        })
+        .collect();
+
     let parser = Parser::new_ext(text, options);
 
     let mut events = Vec::new();
@@ -56,22 +66,28 @@ pub fn render_markdown(text: &str) -> (String, String) {
                 ..
             }) => {
                 let lvl = level as u32;
+                let resolved_id = if let Some(explicit) = id.as_ref() {
+                    explicit.to_string()
+                } else {
+                    // Generate an ID that does not collide with any explicit one.
+                    loop {
+                        heading_counter += 1;
+                        let candidate = format!("heading-{}", heading_counter);
+                        if !reserved_ids.contains(&candidate) {
+                            break candidate;
+                        }
+                    }
+                };
+
                 if (2..=4).contains(&lvl) {
                     current_heading_level = lvl;
-                    current_heading_id = id.as_ref().map(|s| s.to_string()).unwrap_or_else(|| {
-                        heading_counter += 1;
-                        format!("heading-{}", heading_counter)
-                    });
+                    current_heading_id = resolved_id.clone();
                     current_heading_text = String::new();
                     in_heading = true;
                 }
                 events.push(Event::Start(Tag::Heading {
                     level,
-                    id: if current_heading_id.is_empty() {
-                        None
-                    } else {
-                        Some(current_heading_id.clone().into())
-                    },
+                    id: Some(resolved_id.into()),
                     classes,
                     attrs,
                 }));
@@ -92,12 +108,16 @@ pub fn render_markdown(text: &str) -> (String, String) {
                 events.push(event);
             }
             Event::Code(ref t) if in_heading => {
-                // Finding 1: Collect inline code
+                current_heading_text.push_str(t);
+                events.push(event);
+            }
+            Event::InlineMath(ref t) | Event::DisplayMath(ref t) if in_heading => {
                 current_heading_text.push_str(t);
                 events.push(event);
             }
             Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced(ref lang))) => {
-                let lang_str = lang.as_ref();
+                let info = lang.as_ref();
+                let lang_str = info.split_whitespace().next().unwrap_or("");
                 let mut code = String::new();
                 for next_event in iter.by_ref() {
                     match next_event {
@@ -167,7 +187,7 @@ fn build_toc(entries: &[(u32, String, String)]) -> String {
         }
         out.push_str(&format!(
             "<li><a href=\"#{}\">{}</a></li>\n",
-            html::escape(id), // Finding 2: Sanitization
+            html::escape(id),
             html::escape(text)
         ));
     }
@@ -181,7 +201,7 @@ fn build_toc(entries: &[(u32, String, String)]) -> String {
 
 fn post_process(html: &str) -> String {
     let html = _task_lists(html);
-    let html = SCRIPT_TAG.replace_all(&html, "").into_owned(); // Finding 4: Remove scripts
+    let html = SCRIPT_TAG.replace_all(&html, "").into_owned();
 
     // RAW_META lookahead replacement logic
     let mut out = String::new();
@@ -221,21 +241,31 @@ fn _task_lists(html: &str) -> String {
         .into_owned()
 }
 
+/// Rename `name` (and `id` for `<object>`) attributes to `data-mdv-*`
+/// on security-sensitive tags, preventing DOM clobbering.
+/// Uses byte offsets throughout (O(N)); skips matches inside already-consumed regions.
 fn _unname_tags(html_text: &str) -> String {
-    let chars: Vec<char> = html_text.chars().collect();
+    let bytes = html_text.as_bytes();
+    let len = bytes.len();
     let mut out = String::new();
-    let mut pos = 0;
-    let n = chars.len();
+    // Byte offset up to which input has been consumed.
+    let mut pos: usize = 0;
 
-    // Re-check lookahead logic: <tag followed by a boundary
     for caps in NAMED_TAG.captures_iter(html_text) {
         let Some(m) = caps.get(0) else { continue };
 
-        let end_char = html_text[..m.end()].chars().count();
+        // Skip matches that start inside already-consumed text (nested tags in attributes).
+        if m.start() < pos {
+            continue;
+        }
 
-        // Check boundary
-        let is_boundary = if end_char < n {
-            is_tag_boundary(chars[end_char])
+        let m_end = m.end(); // byte offset just past the tag name
+
+        // Boundary check: the char right after the tag name must be a tag boundary.
+        let is_boundary = if m_end < len {
+            // Tag names are ASCII so m_end is on a char boundary.
+            let next_char = html_text[m_end..].chars().next().unwrap_or(' ');
+            is_tag_boundary(next_char)
         } else {
             true
         };
@@ -243,77 +273,77 @@ fn _unname_tags(html_text: &str) -> String {
             continue;
         }
 
-        out.push_str(&chars[pos..end_char].iter().collect::<String>());
+        // Copy text from previous position up to (and including) the tag name.
+        out.push_str(&html_text[pos..m_end]);
 
         let tag_name = caps
             .get(1)
             .map(|v| v.as_str().to_lowercase())
             .unwrap_or_default();
-        let renamed = if tag_name == "object" {
-            vec!["name", "id"]
+        let renamed: &[&str] = if tag_name == "object" {
+            &["name", "id"]
         } else {
-            vec!["name"]
+            &["name"]
         };
 
-        let mut i = end_char;
+        let mut i = m_end;
 
-        while i < n && chars[i] != '>' {
-            let c = chars[i];
-            if " \t\n\x0C\r/".contains(c) {
-                out.push(c);
+        // Walk the attributes until we hit an unquoted `>` or end of input.
+        // Quoted attribute values are consumed whole so `>` inside them is skipped.
+        while i < len && bytes[i] != b'>' {
+            let c = bytes[i];
+            if b" \t\n\x0C\r/".contains(&c) {
+                out.push(c as char);
                 i += 1;
                 continue;
             }
 
+            // Attribute name (ASCII).
             let mut j = i + 1;
-            while j < n && !" \t\n\x0C\r/>=".contains(chars[j]) {
+            while j < len && !b" \t\n\x0C\r/>=\"".contains(&bytes[j]) {
                 j += 1;
             }
-            let attr_name = chars[i..j].iter().collect::<String>();
+            let attr_name = &html_text[i..j];
             if renamed.contains(&attr_name.to_lowercase().as_str()) {
                 out.push_str("data-mdv-");
-                out.push_str(&attr_name);
-            } else {
-                out.push_str(&attr_name);
             }
+            out.push_str(attr_name);
             i = j;
 
+            // Optional whitespace then `=`.
             let mut k = i;
-            while k < n && " \t\n\x0C\r".contains(chars[k]) {
+            while k < len && b" \t\n\x0C\r".contains(&bytes[k]) {
                 k += 1;
             }
-            if k < n && chars[k] == '=' {
+            if k < len && bytes[k] == b'=' {
                 k += 1;
-                while k < n && " \t\n\x0C\r".contains(chars[k]) {
+                // Whitespace after `=`.
+                while k < len && b" \t\n\x0C\r".contains(&bytes[k]) {
                     k += 1;
                 }
-                if k < n && ("\"'".contains(chars[k])) {
-                    let quote = chars[k];
+                if k < len && (bytes[k] == b'"' || bytes[k] == b'\'') {
+                    let quote = bytes[k];
                     k += 1;
-                    let mut found = false;
-                    while k < n {
-                        if chars[k] == quote {
-                            k += 1;
-                            found = true;
-                            break;
-                        }
+                    while k < len && bytes[k] != quote {
                         k += 1;
                     }
-                    if !found {
-                        k = n;
+                    if k < len {
+                        k += 1; // past closing quote
                     }
                 } else {
-                    while k < n && !" \t\n\x0C\r>".contains(chars[k]) {
+                    // Unquoted value.
+                    while k < len && !b" \t\n\x0C\r>".contains(&bytes[k]) {
                         k += 1;
                     }
                 }
-                out.push_str(&chars[i..k].iter().collect::<String>());
+                out.push_str(&html_text[i..k]);
                 i = k;
             }
         }
+        // `i` is now on `>` or at end of input; leave `>` for the tail copy.
         pos = i;
     }
-    out.push_str(&chars[pos..].iter().collect::<String>());
+    out.push_str(&html_text[pos..]);
     out
 }
 
@@ -324,8 +354,77 @@ mod tests {
     #[test]
     fn test_unname_tags() {
         let input = "<img name=\"foo\" src=\"bar.png\"><object id=\"obj\" name=\"objname\">";
-        let expected = "<img data-mdv-name=\"foo\" src=\"bar.png\"><object data-mdv-id=\"obj\" data-mdv-name=\"objname\">";
+        let expected =
+            "<img data-mdv-name=\"foo\" src=\"bar.png\"><object data-mdv-id=\"obj\" data-mdv-name=\"objname\">";
         assert_eq!(_unname_tags(input), expected);
+    }
+
+    // Finding 4 regression: nested tags in attribute values must not panic or corrupt output.
+    #[test]
+    fn test_unname_tags_nested() {
+        let input = r#"<img alt="<img>" src="x.png">"#;
+        let result = _unname_tags(input);
+        // The outer <img> is processed; the inner `<img>` inside quotes is data, not a tag.
+        assert!(result.contains("src=\"x.png\""));
+        // Must not panic and must produce valid output containing the closing `>`.
+        assert!(result.ends_with('>'));
+    }
+
+    // Finding 1 regression: O(N) instead of O(N^2) -- no explicit timing, but the old code
+    // used chars().count() per match; this exercises a long input to verify correctness.
+    #[test]
+    fn test_unname_tags_many_matches() {
+        let input: String = (0..100)
+            .map(|i| format!("<img name=\"n{}\" src=\"s{}.png\">", i, i))
+            .collect();
+        let result = _unname_tags(&input);
+        assert_eq!(
+            result.matches("data-mdv-name").count(),
+            100,
+            "all 100 name attrs should be renamed"
+        );
+    }
+
+    // Finding 3 regression: multiline script tags must be removed.
+    #[test]
+    fn test_script_tag_multiline() {
+        let input =
+            "<p>hello</p><script type=\"text/javascript\">\nalert('xss');\n</script><p>world</p>";
+        let result = post_process(input);
+        assert!(
+            !result.contains("<script"),
+            "multiline script tag should be removed"
+        );
+        assert!(result.contains("<p>hello</p>"));
+        assert!(result.contains("<p>world</p>"));
+    }
+
+    // Finding 5 regression: generated IDs must not collide with explicit ones.
+    #[test]
+    fn test_heading_ids_no_collision() {
+        // The first heading has an explicit ID "heading-1"; the second has no explicit ID.
+        // The generated ID for the second must skip "heading-1".
+        let md = "## First {#heading-1}\n\n## Second\n";
+        let (body, _toc) = render_markdown(md);
+        assert!(body.contains("id=\"heading-1\""), "explicit ID preserved");
+        // The generated ID must not also be "heading-1".
+        let count = body.matches("id=\"heading-1\"").count();
+        assert_eq!(count, 1, "heading-1 must appear exactly once");
+        assert!(
+            body.contains("id=\"heading-2\""),
+            "generated ID should be heading-2 (skipping heading-1)"
+        );
+    }
+
+    // Finding 2 regression: explicit heading IDs outside TOC levels are preserved.
+    #[test]
+    fn test_explicit_id_outside_toc_levels() {
+        let md = "# Title {#my-title}\n\n## Section\n";
+        let (body, _toc) = render_markdown(md);
+        assert!(
+            body.contains("id=\"my-title\""),
+            "explicit ID on h1 (outside TOC levels 2-4) must be preserved"
+        );
     }
 
     #[test]
@@ -338,15 +437,13 @@ mod tests {
     #[test]
     fn test_render_markdown_basic() {
         let (body, _) = render_markdown("# Hello\n\nworld");
-        println!("BODY: {}", body);
-        assert!(body.contains("<h1>Hello</h1>") || body.contains("<h1>\nHello\n</h1>"));
+        assert!(body.contains("<h1") && body.contains("Hello"));
         assert!(body.contains("<p>world</p>") || body.contains("<p>\nworld\n</p>"));
     }
 
     #[test]
     fn test_mermaid() {
         let (body, _) = render_markdown("```mermaid\ngraph TD; A-->B;\n```");
-        println!("BODY: {}", body);
         assert!(body.contains("class=\"mermaid\""));
         assert!(body.contains("graph TD; A--&gt;B;"));
     }
