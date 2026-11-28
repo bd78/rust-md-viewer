@@ -8,22 +8,22 @@ not started, partial, done.
 | Markdown: tables, footnotes, task lists, admonitions, definition lists, highlighting | not started | | |
 | Markdown: ` ```mermaid ` blocks as diagrams | not started | | |
 | Mermaid files (`.mmd`, `.mermaid`) | not started | | |
-| Delimited files: colour per column, sniffed delimiter, quoted fields, 5,000-row cut | partial | #3 | parsing and HTML, matching Python's `csv` Sniffer and reader; no window yet. Differs on purpose: alignment that would add more than 8 Mi padding entities shows the file unaligned |
+| Delimited files: colour per column, sniffed delimiter, quoted fields, 5,000-row cut | partial | #4 | parsing and HTML, matching Python's `csv` Sniffer and reader; no window yet. Differs on purpose: alignment that would add more than 8 Mi padding entities shows the file unaligned |
 | Delimited files: align button, remembered | not started | | |
-| SVG: vector zoom, natural size from the viewBox | partial | #3 | size detection |
+| SVG: vector zoom, natural size from the viewBox | partial | #4 | size detection |
 | Raster images: zoom and drag to pan | not started | | |
-| Text files: verbatim, UTF-16/UTF-8/cp1252, cut at 5 MB | partial | #3 | reading and decoding |
+| Text files: verbatim, UTF-16/UTF-8/cp1252, cut at 5 MB | partial | #4 | reading and decoding |
 | Mermaid script: pinned, SHA-256 checked, `--fetch-assets`, `./assets/` copy | not started | | |
 | Command line: files, `--style`/`--light`/`--dark`/`--github`/`--github-ext`, `--no-watch` | not started | | |
 | Tabs and single instance | not started | | |
 | Sidebar | not started | | |
 | Refresh (F5) and file watching | not started | | |
-| Styles: four looks, Ctrl+D, 1 to 4, remembered | partial | #3 | the style choice rules |
+| Styles: four looks, Ctrl+D, 1 to 4, remembered | partial | #4 | the style choice rules |
 | Fonts | not started | | |
 | Find | not started | | |
 | Zoom | not started | | |
 | All shortcuts | not started | | |
 | Links: local documents open in the tab with back and forward, `http(s)` in the browser, the rest handed to the OS after asking | not started | | |
 | File associations (Windows, `--register`) | not started | | |
-| Preferences saved safely (`prefs.json`) | done | #3 | |
+| Preferences saved safely (`prefs.json`) | done | #4 | |
 | Read-only; documents cannot run script, reach the app or navigate away | not started | | |
