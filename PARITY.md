@@ -23,7 +23,7 @@ not started, partial, done.
 | Find | not started | | |
 | Zoom | not started | | |
 | All shortcuts | not started | | |
-| Links: local documents open in the tab with back and forward, `http(s)` in the browser, the rest handed to the OS after asking | not started | | |
+| Links: local documents open in the tab with back and forward, `http(s)` in the browser, the rest handed to the OS after asking | partial | #5 | href to path, network-path check and OS hand-off; no window, tabs or asking yet. Differs on purpose: hrefs over 32 KiB and a bare `file:` give no path; a local symlink to a network share comes back unresolved so the caller asks before it is touched |
 | File associations (Windows, `--register`) | not started | | |
 | Preferences saved safely (`prefs.json`) | done | #4 | |
 | Read-only; documents cannot run script, reach the app or navigate away | not started | | |
